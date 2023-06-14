@@ -801,10 +801,11 @@ QuiverImportExport.base64 = new class extends QuiverImportExport {
             offset = offset.min(vertex.position);
         }
         for (const vertex of quiver.cells[0]) {
-            const { label, label_colour } = vertex;
+            const { label, label_colour, info } = vertex;
             indices.set(vertex, cells.length);
             const position = vertex.position.sub(offset).toArray();
             const cell = [...position];
+            cell.push(info !== ""?info:"none");
             // In the name of efficiency, we omit any parameter that is not necessary, and for which
             // no later parameter is necessary.
             if (label !== "") {
@@ -819,7 +820,7 @@ QuiverImportExport.base64 = new class extends QuiverImportExport {
 
         for (let level = 1; level < quiver.cells.length; ++level) {
             for (const edge of quiver.cells[level]) {
-                const { label, label_colour, options: { label_alignment, ...options } } = edge;
+                const { info, label, label_colour, options: { label_alignment, ...options } } = edge;
                 const [source, target] = [indices.get(edge.source), indices.get(edge.target)];
                 indices.set(edge, cells.length);
                 const cell = [source, target];
@@ -878,6 +879,8 @@ QuiverImportExport.base64 = new class extends QuiverImportExport {
                 // It's only necessary to encode the label alignment if the label is not blank.
                 push_if_necessary(variant, 0, label !== "");
                 push_if_necessary(label, "");
+
+                cell.push(info !== ""?info:"none");
 
                 cell.push(...end.reverse());
                 cells.push(cell);
@@ -992,7 +995,7 @@ QuiverImportExport.base64 = new class extends QuiverImportExport {
                     // This cell is a vertex.
 
                     assert(cell.length >= 2 && cell.length <= 4, "invalid vertex format");
-                    const [x, y, label = "", label_colour = Colour.black().hsla()] = cell;
+                    const [x, y, info, label = "", label_colour = Colour.black().hsla()] = cell;
                     assert_kind(x, "natural");
                     assert_kind(y, "natural");
                     assert_kind(label, "string");
@@ -1000,6 +1003,7 @@ QuiverImportExport.base64 = new class extends QuiverImportExport {
 
                     const vertex = new Vertex(
                         ui,
+                        info,
                         label,
                         new Position(x, y),
                         new Colour(...label_colour),
@@ -1010,13 +1014,14 @@ QuiverImportExport.base64 = new class extends QuiverImportExport {
 
                     assert(cell.length >= 2 && cell.length <= 6, "invalid edge format");
                     const [
-                        source, target, label = "", alignment = 0, options = {},
+                        source, target, info, label = "", alignment = 0, options = {},
                         label_colour = Colour.black().hsla()
                     ] = cell;
                     for (const [endpoint, name] of [[source, "source"], [target, "target"]]) {
                         assert_kind(endpoint, "natural");
                         assert(endpoint < indices.length, `invalid ${name} index`);
                     }
+                    assert_kind(info, "string")
                     assert_kind(label, "string");
                     assert_kind(alignment, "natural");
                     assert(alignment <= 3, "invalid label alignment");
@@ -1089,6 +1094,7 @@ QuiverImportExport.base64 = new class extends QuiverImportExport {
 
                     const edge = new Edge(
                         ui,
+                        info,
                         label,
                         indices[source],
                         indices[target],

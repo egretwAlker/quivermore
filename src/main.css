@@ -417,7 +417,7 @@ being. */
 
 .side.panel {
     width: calc(16px * 18);
-    top: 16px;
+    top: 100px;
     bottom: 16px;
     right: 16px;
 
@@ -630,6 +630,20 @@ input[type="text"].flash {
     margin: 8px 0;
 
     text-align: center;
+}
+
+.panel textarea {
+    color: var(--ui-white);
+    width: 100%;
+
+    background-color: var(--ui-background);
+    background-repeat: no-repeat;
+    /* We use stacked backgrounds for the background image, */
+    /* to allow us to change the image directly via CSS. */
+    background-size: 0%, auto;
+    border: var(--ui-border) solid 1px;
+    border-radius: 2px;
+    outline: none;
 }
 
 .panel input[type="radio"] {

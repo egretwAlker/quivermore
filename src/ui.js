@@ -347,7 +347,7 @@ UIMode.Connect = class extends UIMode {
 
         const label = "";
         // The edge itself does all the set up, such as adding itself to the page.
-        return new Edge(ui, label, source, target, options);
+        return new Edge(ui, "", label, source, target, options);
     }
 
     /// Connects the source and target. Note that this does *not* check whether the source and
@@ -445,8 +445,6 @@ UIMode.KeyMove = class extends UIMode {
 
         // Hide various inputs and panels.
         ui.panel.hide(ui);
-        ui.panel.label_input.parent.class_list.add("hidden");
-        ui.colour_picker.close();
         ui.focus_point.class_list.remove("focused", "smooth");
         // Add the tooltip.
         ui.element.add(this.tooltip);
@@ -1233,7 +1231,7 @@ class UI {
         // several actions that can trigger the creation of a vertex.
         const create_vertex = (position) => {
             const label = "\\bullet";
-            return new Vertex(this, label, position);
+            return new Vertex(this, "", label, position);
         };
 
         const create_vertex_at_focus_point = (event) => {
@@ -2524,11 +2522,8 @@ class UI {
             this.update_focus_tooltip();
             this.panel.update(this);
             this.toolbar.update(this);
-            if (this.selection_contains_edge()) {
-                this.panel.element.class_list.remove("hidden");
-            }
             if (this.selection.size > 0) {
-                this.panel.label_input.parent.class_list.remove("hidden");
+                this.panel.unhide();
             }
         }
     }
@@ -3575,6 +3570,9 @@ class Panel {
         // The label input element.
         this.label_input = null;
 
+        // Textarea for info
+        this.info = null;
+
         // Buttons and options affecting the entire diagram (e.g. export, macros).
         this.global = null;
 
@@ -3752,6 +3750,26 @@ class Panel {
                 ui.switch_mode(UIMode.default);
             }
         });
+
+        const add_textarea = () => {
+            this.info = new DOM.Element("textarea", {
+                rows: 5
+            });
+            this.info.add_to(wrapper);
+            this.info.listen("keydown", (event) => {
+                event.stopPropagation();
+            });
+            this.info.listen("input", () => {
+                if (!ui.in_mode(UIMode.Command)) {
+                    const selection = Array.from(ui.selection);
+                    if(selection.length !== 1) return;
+                    const cell = selection[0];
+                    cell.info = this.info.element.value;
+                }
+            });
+        };
+
+        add_textarea();
 
         const add_button = (title, label, key, action) => {
             const button
@@ -4988,6 +5006,7 @@ class Panel {
                 // to include them here.
                 consider("{label}", cell.label);
                 consider("{label_colour}", cell.label_colour);
+                consider("{info}", cell.info)
 
                 // Edge-specific options.
                 if (cell.is_edge()) {
@@ -5049,6 +5068,9 @@ class Panel {
             for (const [name, value] of values) {
                 const property = name.slice(1, -1);
                 switch (name) {
+                    case "{info}":
+                        this.info.element.value = value === null ? "" : value;
+                        break;
                     case "{label}":
                         if (value === null || this.label_input.element.value !== value) {
                             // Most browsers handle resetting an input value with the same value
@@ -5175,6 +5197,9 @@ class Panel {
             this.global.query_selector_all(`input[type="text"]`).forEach((input) => {
                 input.element.disabled = false;
             });
+            // this.element.query_selector_all(`textarea`).forEach((input) => {
+            //     input.element.disabled = false;
+            // });
         } else {
             // Disable all the inputs.
             this.element.query_selector_all("input, button")
@@ -5185,23 +5210,23 @@ class Panel {
         }
     }
 
+    unhide(ui) {
+        this.element.class_list.remove("hidden");
+        this.label_input.parent.class_list.remove("hidden");
+    }
+
     /// Hide the panel off-screen.
     hide(ui) {
-        if (ui.colour_picker.is_targeting(ColourPicker.TARGET.Edge)) {
-            ui.colour_picker.close();
-        }
         this.element.class_list.add("hidden");
+        this.label_input.parent.class_list.add("hidden");
         this.defocus_inputs();
+        ui.colour_picker.close();
     }
 
     /// Hide the panel and label input if no relevant cells are selected.
     hide_if_unselected(ui) {
-        if (!ui.selection_contains_edge()) {
-            this.hide(ui);
-        }
         if (ui.selection.size === 0) {
-            this.label_input.parent.class_list.add("hidden");
-            ui.colour_picker.close();
+            this.hide(ui);
         }
     }
 
@@ -5234,11 +5259,11 @@ class Panel {
 
     /// Centre the panel vertically.
     update_position() {
-        const panel_height
-            = this.element.query_selector(".wrapper").bounding_rect().height;
-        const document_height = document.body.offsetHeight;
-        const top_offset = Math.max(document_height - panel_height - 16 * 2, 0) / 2;
-        this.element.set_style({ "margin-top": `${top_offset}px`});
+        // const panel_height
+        //     = this.element.query_selector(".wrapper").bounding_rect().height;
+        // const document_height = document.body.offsetHeight;
+        // const top_offset = Math.max(document_height - panel_height - 16 * 2, 0) / 2;
+        // this.element.set_style({ "margin-top": `${top_offset}px`});
     }
 
     /// Dismiss the export pane, if it is shown.
@@ -5606,8 +5631,6 @@ class Toolbar {
             () => {
                 ui.deselect();
                 ui.panel.hide(ui);
-                ui.panel.label_input.parent.class_list.add("hidden");
-                ui.colour_picker.close();
             },
         );
 
@@ -6128,9 +6151,12 @@ ColourPicker.TARGET = new Enum(
 /// An k-cell (such as a vertex or edge). This object represents both the
 /// abstract properties of the cell as well as their HTML representation.
 class Cell {
-    constructor(quiver, level, label = "", label_colour = Colour.black()) {
+    constructor(quiver, level, info = "", label = "", label_colour = Colour.black()) {
         // The k for which this cell is an k-cell.
         this.level = level;
+
+        // The info for supplemental information
+        this.info = info
 
         // The label with which the vertex or edge is annotated.
         this.label = label;
@@ -6435,8 +6461,8 @@ Cell.NEXT_ID = 0;
 
 /// 0-cells, or vertices. This is primarily specialised in its set up of HTML elements.
 class Vertex extends Cell {
-    constructor(ui, label, position, label_colour = Colour.black()) {
-        super(ui.quiver, 0, label, label_colour);
+    constructor(ui, info, label, position, label_colour = Colour.black()) {
+        super(ui.quiver, 0, info, label, label_colour);
 
         this.position = position;
         // The shape data is going to be overwritten immediately, so really this information is
@@ -6559,8 +6585,8 @@ class Vertex extends Cell {
 
 /// k-cells (for k > 0), or edges. This is primarily specialised in its set up of HTML elements.
 class Edge extends Cell {
-    constructor(ui, label = "", source, target, options, label_colour) {
-        super(ui.quiver, Math.max(source.level, target.level) + 1, label, label_colour);
+    constructor(ui, info="", label = "", source, target, options, label_colour) {
+        super(ui.quiver, Math.max(source.level, target.level) + 1, info, label, label_colour);
 
         this.options = Edge.default_options(Object.assign({ level: this.level }, options));
 
